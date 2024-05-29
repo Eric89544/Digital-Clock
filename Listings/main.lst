@@ -1,0 +1,582 @@
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.2.7.0
+OBJECT MODULE PLACED IN .\Objects\main.obj
+ASSEMBLER INVOKED BY: D:\KeilMDK\C51\BIN\A51.EXE main.a51 SET(SMALL) DEBUG PRINT(.\Listings\main.lst) OBJECT(.\Objects\m
+                      ain.obj) EP
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     
+  00B1                 2     SETUP_BUTTON    BIT P3.1    
+  00B0                 3     INCREMENT_BUTTON BIT P3.0   
+  00B2                 4     CONFIRM_BUTTON BIT P3.2     
+  00B3                 5     SWITCH_BUTTON BIT P3.3     
+                       6             
+                       7     
+  0030                 8     MODE_FLAG      EQU 30H      
+  003A                 9     SWITCH_FLAG             EQU 3AH         ;=0表示显示时间，=1表示显示日期
+                      10             
+                      11     
+  0031                12     SECONDS        DATA 31H     
+  0032                13     MINUTES        DATA 32H     
+  0033                14     HOURS          DATA 33H     
+  0034                15     DISPLAY_COUNTER DATA 34H    
+  0035                16     DELAY_COUNTER  DATA 35H     
+  0039                17     YEARH                   DATA 39H             ;年份高两位
+  0038                18     YEAR                    DATA 38H               ;年份低两位存放单元
+  0037                19     MONTH                   DATA 37H            ;月份存放单元
+  0036                20     DAY                     DATA 36H                ;日存放单元
+                      21     
+                      22     
+  003C                23     SECONDS_MAX    EQU 60       
+  003C                24     MINUTES_MAX    EQU 60       
+  0018                25     HOURS_MAX      EQU 24       
+  001F                26     DAY_MAX                 EQU 31
+  000C                27     MONTH_MAX               EQU 12
+  0063                28     YEAR_MAX                EQU 99
+                      29                             
+                      30     
+                      31     
+0000                  32     ORG 0000H
+0000 0145             33     AJMP MAIN                 
+                      34     
+                      35     
+001B                  36     ORG 001BH
+001B 020070           37     LJMP TIMER_INTERRUPT      
+                      38     
+                      39     
+0045                  40     ORG 0045H
+0045                  41     MAIN:
+0045 D295             42             SETB P1.5
+0047 758160           43         MOV SP, #60H           
+004A 758910           44         MOV TMOD, #10H         
+004D 758D3C           45         MOV TH1, #3CH          
+0050 758BB0           46         MOV TL1, #0B0H         
+0053 75A888           47         MOV IE, #88H           
+0056 D28E             48         SETB TR1               
+0058 D2D5             49         SETB F0                
+005A 753914           50             MOV YEARH, #14H                  
+005D 753818           51             MOV YEAR, #18H
+0060 753706           52             MOV MONTH, #06H
+0063 753607           53             MOV DAY, #07H
+0066                  54     MAIN_LOOP:
+0066 12010A           55         LCALL DISPLAY_TIMES          
+0069 1201B6           56             LCALL DISPLAY_DATES          
+006C 516D             57         ACALL SETTING_MODE     
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     2
+
+006E 80F6             58         SJMP MAIN_LOOP         
+                      59     
+                      60     
+0070                  61     TIMER_INTERRUPT:
+0070 C0E0             62         PUSH ACC               
+0072 C0D0             63         PUSH PSW               
+0074 758D3C           64         MOV TH1, #3CH          
+0077 758BB0           65         MOV TL1, #0B0H         
+007A 0F               66         INC R7                 
+007B BF1476           67         CJNE R7, #14H, TIMER_INTERRUPT_CONTINUE_M    
+007E 7F00             68         MOV R7, #00H           
+                      69         
+0080 0531             70         INC SECONDS           ; 增加秒计数
+0082 E531             71         MOV A, SECONDS        ; 将 SECONDS 的值移动到累加器
+0084 B43C7E           72         CJNE A, #SECONDS_MAX, TIMER_INTERRUPT_CONTINUE  ; 比较累加器的值与 SECONDS_MAX
+0087 753100           73         MOV SECONDS, #00H     ; 如果相等，清零秒计数
+008A 0532             74         INC MINUTES           ; 增加分计数
+008C E532             75         MOV A, MINUTES        ; 将 MINUTES 的值移动到累加器
+008E B43C74           76         CJNE A, #MINUTES_MAX, TIMER_INTERRUPT_CONTINUE  ; 比较累加器的值与 MINUTES_MAX
+0091 753200           77         MOV MINUTES, #00H     ; 如果相等，清零分计数
+0094 0533             78         INC HOURS             ; 增加小时计数
+0096 E533             79         MOV A, HOURS          ; 将 HOURS 的值移动到累加器
+0098 B4186A           80         CJNE A, #HOURS_MAX, TIMER_INTERRUPT_CONTINUE  ; 比较累加器的值与 HOURS_MAX
+009B 753300           81         MOV HOURS, #00H       ; 如果相等，清零小时计数
+                      82             
+009E 0536             83             INC DAY
+00A0 E537             84             MOV A,MONTH
+00A2 04               85             INC A
+00A3 83               86             MOVC  A,@A+PC
+00A4 800C             87             SJMP  DAY_JUDGEMENT
+00A6 312831           88             DB 31H,28H,31H       ;对应月份编码:01H,02H,03H
+00A9 303130           89             DB 30H,31H,30H       ;对应月份编码:04H,05H,06H
+00AC 313130           90             DB 31H,31H,30H       ;对应月份编码:07H,08H,09H
+00AF 313031           91             DB 31H,30H,31H       ;对应月份编码:0AH,0BH,0CH
+                      92     
+00B2                  93     DAY_JUDGEMENT:
+00B2 C3               94             CLR   C
+00B3 9536             95             SUBB  A,DAY
+00B5 504E             96             JNC   TIMER_INTERRUPT_CONTINUE                ;本月未满
+00B7 E537             97             MOV   A,MONTH
+00B9 B4023A           98             CJNE  A,#2,NOT_LEAP       ;不是二月就跳到 NOT_LEAP
+00BC E538             99             MOV   A,YEAR
+00BE 853882          100             MOV DPL, YEAR
+00C1 853983          101         MOV DPH, YEARH
+                     102             
+                     103             ; 检查是否能被4整除
+00C4 E583            104         MOV A, DPH
+00C6 75F004          105         MOV B, #4
+00C9 84              106         DIV AB
+00CA E5F0            107         MOV A, B
+00CC B40027          108         CJNE A, #0, NOT_LEAP
+                     109     
+                     110         ; 检查是否能被100整除
+00CF E582            111         MOV A, DPL
+00D1 75F064          112         MOV B, #100
+00D4 84              113         DIV AB
+00D5 E5F0            114         MOV A, B
+00D7 B40012          115         CJNE A, #0, LEAP
+                     116     
+                     117         ; 检查是否能被400整除
+00DA 75F0C8          118             MOV B, #200             ;寄存器只能存储 8 位（一个字节）的数据.400
+                             无法直接放进去
+00DD 25F0            119             ADD A, B
+00DF 75F0C8          120             MOV B, #200
+00E2 25F0            121             ADD A, B
+00E4 E582            122         MOV A, DPL
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     3
+
+00E6 84              123         DIV AB
+00E7 E5F0            124         MOV A, B
+00E9 B4000A          125         CJNE A, #0, NOT_LEAP
+                     126             
+00EC                 127     LEAP:
+00EC E536            128             MOV   A,DAY
+00EE 6429            129             XRL   A,#29H
+00F0 6013            130             JZ    TIMER_INTERRUPT_CONTINUE              ;闰年二月可以有29日
+00F2 7002            131             JNZ             NOT_LEAP
+                     132             
+00F4                 133     TIMER_INTERRUPT_CONTINUE_M:
+00F4 800F            134             JMP TIMER_INTERRUPT_CONTINUE
+                     135             
+00F6                 136     NOT_LEAP:
+00F6 753601          137             MOV   DAY,#1          ;调整到下个月的1日
+00F9 0537            138             INC   MONTH
+00FB E537            139             MOV A, MONTH          ; 将 MONTH 的值移动到累加器
+00FD B40C05          140         CJNE A, #MONTH_MAX, TIMER_INTERRUPT_CONTINUE  ; 比较累加器的值与 MONTH_MAX
+0100 753700          141         MOV MONTH, #00H       ; 如果相等，清零计数
+0103 0538            142             INC YEAR
+                     143             
+0105                 144     TIMER_INTERRUPT_CONTINUE:
+0105 D0D0            145         POP PSW                
+0107 D0E0            146         POP ACC                
+0109 32              147         RETI                   
+                     148     
+                     149     
+010A                 150     DISPLAY_TIMES:
+010A E53A            151             MOV A,SWITCH_FLAG
+010C B40012          152             CJNE A,#0,DISPLAY_SECONDS_CONTINUE_M    ;SWITCH_FLAG不是0就返回主程序
+                     153             
+010F 900318          154         MOV DPTR, #DIGIT_TABLE  
+0112 0534            155         INC DISPLAY_COUNTER     
+0114 E530            156         MOV A, MODE_FLAG        
+0116 B4010A          157         CJNE A, #1, DISPLAY_HOURS   
+0119 C3              158         CLR C
+011A E534            159             MOV A, DISPLAY_COUNTER    ; 将 DISPLAY_COUNTER 的值加载到累加器 A 中
+011C B48000          160             CJNE A, #128, DISPLAY_HOURS_CHECK      
+011F                 161     DISPLAY_HOURS_CHECK:
+011F 4022            162         JC DISPLAY_HOURS_CONTINUE   
+0121                 163     DISPLAY_SECONDS_CONTINUE_M:             ;DISPLAY_SECONDS_CONTINUE的中间跳转程序，�
+                             �要是解决距离太远无法跳转的问题
+0121 21B5            164             JMP DISPLAY_SECONDS_CONTINUE
+0123                 165     DISPLAY_HOURS:
+0123 E533            166         MOV A, HOURS           
+0125 75F00A          167         MOV B, #0AH            
+0128 84              168         DIV AB
+0129 93              169         MOVC A, @A+DPTR        
+012A F580            170         MOV P0, A              
+012C 75A0FF          171         MOV P2, #0FFH
+012F D535FD          172         DJNZ DELAY_COUNTER, $
+0132 758000          173         MOV P0, #00H
+                     174         
+0135 E5F0            175         MOV A, B               
+0137 93              176         MOVC A, @A+DPTR
+0138 F580            177         MOV P0, A
+013A 75A0FB          178         MOV P2, #0FBH
+013D D535FD          179         DJNZ DELAY_COUNTER, $
+0140 758000          180         MOV P0, #00H
+                     181         
+0143                 182     DISPLAY_HOURS_CONTINUE:
+0143 758040          183         MOV P0, #40H           
+0146 75A0F7          184         MOV P2, #0F7H
+0149 D535FD          185         DJNZ DELAY_COUNTER, $
+014C 758000          186         MOV P0, #00H
+                     187         
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     4
+
+014F E530            188         MOV A, MODE_FLAG        
+0151 B40208          189         CJNE A, #2, DISPLAY_MINUTES   
+0154 C3              190         CLR C
+0155 E534            191         MOV A, DISPLAY_COUNTER    ; 将 DISPLAY_COUNTER 的值加载到累加器 A 中
+0157 B48000          192             CJNE A, #128, DISPLAY_MINUTES_CHECK   ; 比较累加器 A 的值与立即数 128  /
+                             / 如果顯示計數器不等於 128，跳轉到 DISPLAY_MINUTES_CHECK
+015A                 193     DISPLAY_MINUTES_CHECK:
+015A 4020            194         JC DISPLAY_MINUTES_CONTINUE   
+015C                 195     DISPLAY_MINUTES:
+015C E532            196         MOV A, MINUTES          
+015E 75F00A          197         MOV B, #0AH
+0161 84              198         DIV AB
+0162 93              199         MOVC A, @A+DPTR
+0163 F580            200         MOV P0, A
+0165 75A0F3          201         MOV P2, #0F3H
+0168 D535FD          202         DJNZ DELAY_COUNTER, $
+016B 758000          203         MOV P0, #00H
+                     204         
+016E E5F0            205         MOV A, B
+0170 93              206         MOVC A, @A+DPTR
+0171 F580            207         MOV P0, A
+0173 75A0EF          208         MOV P2, #0EFH
+0176 D535FD          209         DJNZ DELAY_COUNTER, $
+0179 758000          210         MOV P0, #00H
+                     211         
+017C                 212     DISPLAY_MINUTES_CONTINUE:
+017C 758040          213         MOV P0, #40H            
+017F 75A0EB          214         MOV P2, #0EBH
+0182 D535FD          215         DJNZ DELAY_COUNTER, $
+0185 758000          216         MOV P0, #00H
+                     217         
+0188 E530            218         MOV A, MODE_FLAG         
+018A B40308          219         CJNE A, #3, DISPLAY_SECONDS   
+018D C3              220         CLR C
+018E E534            221         MOV A, DISPLAY_COUNTER    ; 将 DISPLAY_COUNTER 的值加载到累加器 A 中
+0190 B48000          222             CJNE A, #128, DISPLAY_SECONDS_CHECK   ; 比较累加器 A 的值与立即数 128  /
+                             / 如果顯示計數器不等於 128，跳轉到 DISPLAY_SECONDS_CHECK
+0193                 223     DISPLAY_SECONDS_CHECK:
+0193 4020            224         JC DISPLAY_SECONDS_CONTINUE   
+0195                 225     DISPLAY_SECONDS:
+0195 E531            226         MOV A, SECONDS          
+0197 75F00A          227         MOV B, #0AH
+019A 84              228         DIV AB
+019B 93              229         MOVC A, @A+DPTR
+019C F580            230         MOV P0, A
+019E 75A0E7          231         MOV P2, #0E7H
+01A1 D535FD          232         DJNZ DELAY_COUNTER, $
+01A4 758000          233         MOV P0, #00H
+                     234         
+01A7 E5F0            235         MOV A, B
+01A9 93              236         MOVC A, @A+DPTR
+01AA F580            237         MOV P0, A
+01AC 75A0E3          238         MOV P2, #0E3H
+01AF D535FD          239         DJNZ DELAY_COUNTER, $
+01B2 758000          240         MOV P0, #00H
+01B5                 241     DISPLAY_SECONDS_CONTINUE:
+01B5 22              242         RET                     
+                     243     
+                     244     ; 顯示程序
+01B6                 245     DISPLAY_DATES:
+01B6 E53A            246             MOV A,SWITCH_FLAG
+01B8 B40103          247             CJNE A,#1,DISPLAY_DAYS_CONTINUE_M       ;SWITCH_FLAG不是1就返回主程序
+01BB 203A02          248             JB SWITCH_FLAG,DISPLAY_DATES_CONTINUE   ;SWITCH_FLAG是1就跳到DISPLAY_DATES_CONT
+                             INUE
+01BE                 249     DISPLAY_DAYS_CONTINUE_M:                ;DISPLAY_DAYS_CONTINUE的中间跳转程序，主�
+                             �是解决距离太远无法跳转的问题
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     5
+
+01BE 416C            250             JMP DISPLAY_DAYS_CONTINUE
+01C0                 251     DISPLAY_DATES_CONTINUE: 
+01C0 900318          252         MOV DPTR, #DIGIT_TABLE    ; 設置數據指針指向顯示字模表
+01C3 0534            253             INC DISPLAY_COUNTER     
+01C5 E530            254         MOV A, MODE_FLAG        
+01C7 B40108          255         CJNE A, #1, DISPLAY_YEARS   
+01CA C3              256         CLR C
+01CB E534            257             MOV A, DISPLAY_COUNTER    ; 将 DISPLAY_COUNTER 的值加载到累加器 A 中
+01CD B48000          258             CJNE A, #128, DISPLAY_YEARS_CHECK      
+01D0                 259     DISPLAY_YEARS_CHECK:
+01D0 4040            260         JC DISPLAY_YEARS_CONTINUE   
+01D2                 261     DISPLAY_YEARS:   
+                     262             ; 顯示年份高两位
+01D2 E539            263         MOV A, YEARH
+01D4 75F00A          264         MOV B, #0AH
+01D7 84              265         DIV AB
+01D8 93              266         MOVC A, @A+DPTR           ; 取十位
+01D9 F580            267         MOV P0, A                 ; 顯示年份高两位的十位
+01DB 75A0FF          268         MOV P2, #0FFH
+01DE D535FD          269         DJNZ DELAY_COUNTER, $
+01E1 758000          270         MOV P0, #00H
+                     271     
+01E4 E5F0            272         MOV A, B
+01E6 93              273         MOVC A, @A+DPTR           ; 取个位
+01E7 F580            274         MOV P0, A                 ; 顯示年份高两位的个位
+01E9 75A0FB          275         MOV P2, #0FBH
+01EC D535FD          276         DJNZ DELAY_COUNTER, $
+01EF 758000          277         MOV P0, #00H
+                     278     
+                     279         ; 顯示年份低两位
+01F2 E538            280         MOV A, YEAR
+01F4 75F00A          281         MOV B, #0AH
+01F7 84              282         DIV AB
+01F8 93              283         MOVC A, @A+DPTR           ; 取十位
+01F9 F580            284         MOV P0, A                 ; 顯示年份低两位的十位
+01FB 75A0F7          285         MOV P2, #0F7H
+01FE D535FD          286         DJNZ DELAY_COUNTER, $
+0201 758000          287         MOV P0, #00H
+                     288     
+0204 E5F0            289         MOV A, B
+0206 93              290         MOVC A, @A+DPTR           ; 取个位
+0207 F580            291         MOV P0, A                 ; 顯示年份低两位的个位
+0209 75A0F3          292         MOV P2, #0F3H
+020C D535FD          293         DJNZ DELAY_COUNTER, $
+020F 758000          294         MOV P0, #00H
+                     295             
+0212                 296     DISPLAY_YEARS_CONTINUE:
+0212 E530            297             MOV A, MODE_FLAG        
+0214 B40208          298         CJNE A, #2, DISPLAY_MONTHS   
+0217 C3              299         CLR C
+0218 E534            300         MOV A, DISPLAY_COUNTER    ; 将 DISPLAY_COUNTER 的值加载到累加器 A 中
+021A B48000          301             CJNE A, #128, DISPLAY_MONTHS_CHECK   ; 比较累加器 A 的值与立即数 128  //
+                              如果顯示計數器不等於 128，跳轉到 DISPLAY_MONTHS_CHECK
+021D                 302     DISPLAY_MONTHS_CHECK:
+021D 4020            303         JC DISPLAY_MONTHS_CONTINUE   
+021F                 304     DISPLAY_MONTHS:
+                     305         ; 顯示月份
+021F E537            306         MOV A, MONTH
+0221 75F00A          307         MOV B, #0AH
+0224 84              308         DIV AB
+0225 93              309         MOVC A, @A+DPTR           ; 取十位
+0226 F580            310         MOV P0, A                 ; 顯示月份的十位
+0228 75A0EF          311         MOV P2, #0EFH
+022B D535FD          312         DJNZ DELAY_COUNTER, $
+022E 758000          313         MOV P0, #00H
+                     314     
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     6
+
+0231 E5F0            315         MOV A, B
+0233 93              316         MOVC A, @A+DPTR           ; 取个位
+0234 F580            317         MOV P0, A                 ; 顯示月份的个位
+0236 75A0EB          318         MOV P2, #0EBH
+0239 D535FD          319         DJNZ DELAY_COUNTER, $
+023C 758000          320         MOV P0, #00H
+                     321     
+023F                 322     DISPLAY_MONTHS_CONTINUE:
+023F E530            323             MOV A, MODE_FLAG         
+0241 B40308          324         CJNE A, #3, DISPLAY_DAYS   
+0244 C3              325         CLR C
+0245 E534            326         MOV A, DISPLAY_COUNTER    ; 将 DISPLAY_COUNTER 的值加载到累加器 A 中
+0247 B48000          327             CJNE A, #128, DISPLAY_DAYS_CHECK   ; 比较累加器 A 的值与立即数 128  // �
+                             ��果顯示計數器不等於 128，跳轉到 DISPLAY_DAYS_CHECK
+024A                 328     DISPLAY_DAYS_CHECK:
+024A 4020            329         JC DISPLAY_DAYS_CONTINUE   
+024C                 330     DISPLAY_DAYS:
+                     331         ; 顯示日期
+024C E536            332         MOV A, DAY
+024E 75F00A          333         MOV B, #0AH
+0251 84              334         DIV AB
+0252 93              335         MOVC A, @A+DPTR           ; 取十位
+0253 F580            336         MOV P0, A                 ; 顯示日期的十位
+0255 75A0E7          337         MOV P2, #0E7H
+0258 D535FD          338         DJNZ DELAY_COUNTER, $
+025B 758000          339         MOV P0, #00H
+                     340     
+025E E5F0            341         MOV A, B
+0260 93              342         MOVC A, @A+DPTR           ; 取个位
+0261 F580            343         MOV P0, A                 ; 顯示日期的个位
+0263 75A0E3          344         MOV P2, #0E3H
+0266 D535FD          345         DJNZ DELAY_COUNTER, $
+0269 758000          346         MOV P0, #00H
+026C                 347     DISPLAY_DAYS_CONTINUE:
+026C 22              348         RET
+                     349     
+                     350     
+026D                 351     SETTING_MODE:
+026D 20B112          352         JB SETUP_BUTTON, SETUP_MODE_0   
+0270 30B1FD          353         JNB SETUP_BUTTON, $             
+0273 C28E            354         CLR TR1                         
+0275 0530            355         INC MODE_FLAG                   
+0277 E530            356         MOV A, MODE_FLAG
+0279 B40414          357         CJNE A, #4, SETUP_RETURN_1        
+027C 753001          358         MOV MODE_FLAG, #1               
+027F 020317          359         LJMP SETUP_RETURN               
+                     360             
+0282                 361     SETUP_MODE_0:
+0282 20B20C          362         JB CONFIRM_BUTTON, SETUP_MODE_1  
+0285 30B2FD          363         JNB CONFIRM_BUTTON, $           
+0288 753000          364         MOV MODE_FLAG, #0               
+028B D28E            365         SETB TR1                        
+028D 020317          366         LJMP SETUP_RETURN               
+                     367             
+0290                 368     SETUP_RETURN_1: ;因为离SETUP_RETURN距离太长，有些指令无法跳转，所以中�
+                             �插一个跟SETUP_RETURN一样功能的片段
+0290 22              369                     RET
+                     370                     
+0291                 371     SETUP_MODE_1:
+0291 E530            372             MOV A, MODE_FLAG
+0293 60FB            373         JZ SETUP_RETURN_1                 
+0295 20B072          374         JB INCREMENT_BUTTON, SETUP_MODE_2  
+0298 30B0FD          375         JNB INCREMENT_BUTTON, $         
+029B E53A            376             MOV A, SWITCH_FLAG      
+029D B40102          377             CJNE A, #1, SETUP_INCREMENT_HOURS  
+02A0 802F            378             SJMP SETUP_INCREMENT_YEAR
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     7
+
+                     379             
+02A2                 380     SETUP_INCREMENT_HOURS:
+02A2 E530            381             MOV A, MODE_FLAG
+02A4 B4010C          382         CJNE A, #1, SETUP_INCREMENT_MINUTES  
+02A7 0533            383         INC HOURS                     
+02A9 E533            384         MOV A, HOURS        ; 将 HOURS 的值移动到累加器
+02AB B41869          385         CJNE A, #HOURS_MAX, SETUP_RETURN  
+02AE 753300          386         MOV HOURS, #00H               
+02B1 8064            387         SJMP SETUP_RETURN               
+                     388             
+02B3                 389     SETUP_INCREMENT_MINUTES:
+02B3 B4020C          390         CJNE A, #2, SETUP_INCREMENT_SECONDS  
+02B6 0532            391         INC MINUTES                     
+02B8 E532            392             MOV A,MINUTES
+02BA B43C5A          393         CJNE A, #MINUTES_MAX, SETUP_RETURN  
+02BD 753200          394         MOV MINUTES, #00H               
+02C0 8055            395         SJMP SETUP_RETURN               
+                     396             
+02C2                 397     SETUP_INCREMENT_SECONDS:
+02C2 B40352          398         CJNE A, #3, SETUP_RETURN        
+02C5 0531            399         INC SECONDS                       
+02C7 E531            400             MOV A,SECONDS
+02C9 B43C4B          401         CJNE A, #SECONDS_MAX, SETUP_RETURN   
+02CC 753100          402         MOV SECONDS, #00H                 
+02CF 8046            403         SJMP SETUP_RETURN               
+                     404             
+02D1                 405     SETUP_INCREMENT_YEAR:
+02D1 E530            406         MOV A, MODE_FLAG
+02D3 B40116          407         CJNE A, #1, SETUP_INCREMENT_MONTH  ; 如果標誌位不等於1，跳轉到 SETUP_INCREM
+                             ENT_MONTH
+02D6 0538            408         INC YEAR                           ; 增加年份低两位計數
+02D8 E538            409         MOV A, YEAR                        ; 将 YEAR 的值移动到累加器
+02DA B4633A          410         CJNE A, #YEAR_MAX, SETUP_RETURN  ; 如果年低两位不等於最大值，跳轉到 SET
+                             UP_RETURN
+02DD 753800          411         MOV YEAR, #00H                     ; 否則清零年份低两位
+02E0 0539            412         INC YEARH                          ; 增加年份高两位計數
+02E2 E539            413         MOV A, YEARH                       ; 将 YEARH 的值移动到累加器
+02E4 B46330          414         CJNE A, #YEAR_MAX, SETUP_RETURN  ; 如果年高两位不等於最大值，跳轉到 SET
+                             UP_RETURN
+02E7 753900          415         MOV YEARH, #00H                    ; 否則清零年份高两位
+02EA 802B            416         SJMP SETUP_RETURN                  ; 跳轉到 SETUP_RETURN
+                     417     
+02EC                 418     SETUP_INCREMENT_MONTH:
+02EC B4020C          419         CJNE A, #2, SETUP_INCREMENT_DAY   
+02EF 0537            420         INC MONTH                     
+02F1 E537            421         MOV A, MONTH
+02F3 B40C21          422         CJNE A, #MONTH_MAX, SETUP_RETURN  
+02F6 753701          423         MOV MONTH, #01H               
+02F9 801C            424         SJMP SETUP_RETURN               
+                     425     
+02FB                 426     SETUP_INCREMENT_DAY:
+02FB B40319          427         CJNE A, #3, SETUP_RETURN        
+02FE 0536            428         INC DAY                       
+0300 E536            429         MOV A, DAY
+0302 B41F12          430         CJNE A, #DAY_MAX, SETUP_RETURN   
+0305 753601          431         MOV DAY, #01H                 
+0308 800D            432         SJMP SETUP_RETURN               
+                     433     
+030A                 434     SETUP_MODE_2:   
+030A 20B30A          435             JB SWITCH_BUTTON, SETUP_RETURN   
+030D 30B3FD          436         JNB SWITCH_BUTTON, $             
+0310 B23A            437             CPL SWITCH_FLAG                                 ;SWITCH_FLAG 取反
+0312 753000          438             MOV MODE_FLAG,#00H                              ;MODE_FLAG清零
+0315 8000            439             SJMP SETUP_RETURN               
+0317                 440     SETUP_RETURN:
+0317 22              441         RET                             
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     8
+
+                     442     
+                     443     
+0318                 444     DIGIT_TABLE:
+0318 3F065B4F        445         DB 0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f    ;0-9
+031C 666D7D07                
+0320 7F6F                    
+                     446         END                             
+                             
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE     9
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E                     T Y P E  V A L U E   ATTRIBUTES
+
+ACC. . . . . . . . . . . .  D ADDR   00E0H   A   
+B. . . . . . . . . . . . .  D ADDR   00F0H   A   
+CONFIRM_BUTTON . . . . . .  B ADDR   00B0H.2 A   
+DAY. . . . . . . . . . . .  D ADDR   0036H   A   
+DAY_JUDGEMENT. . . . . . .  C ADDR   00B2H   A   
+DAY_MAX. . . . . . . . . .  N NUMB   001FH   A   
+DELAY_COUNTER. . . . . . .  D ADDR   0035H   A   
+DIGIT_TABLE. . . . . . . .  C ADDR   0318H   A   
+DISPLAY_COUNTER. . . . . .  D ADDR   0034H   A   
+DISPLAY_DATES. . . . . . .  C ADDR   01B6H   A   
+DISPLAY_DATES_CONTINUE . .  C ADDR   01C0H   A   
+DISPLAY_DAYS . . . . . . .  C ADDR   024CH   A   
+DISPLAY_DAYS_CHECK . . . .  C ADDR   024AH   A   
+DISPLAY_DAYS_CONTINUE. . .  C ADDR   026CH   A   
+DISPLAY_DAYS_CONTINUE_M. .  C ADDR   01BEH   A   
+DISPLAY_HOURS. . . . . . .  C ADDR   0123H   A   
+DISPLAY_HOURS_CHECK. . . .  C ADDR   011FH   A   
+DISPLAY_HOURS_CONTINUE . .  C ADDR   0143H   A   
+DISPLAY_MINUTES. . . . . .  C ADDR   015CH   A   
+DISPLAY_MINUTES_CHECK. . .  C ADDR   015AH   A   
+DISPLAY_MINUTES_CONTINUE .  C ADDR   017CH   A   
+DISPLAY_MONTHS . . . . . .  C ADDR   021FH   A   
+DISPLAY_MONTHS_CHECK . . .  C ADDR   021DH   A   
+DISPLAY_MONTHS_CONTINUE. .  C ADDR   023FH   A   
+DISPLAY_SECONDS. . . . . .  C ADDR   0195H   A   
+DISPLAY_SECONDS_CHECK. . .  C ADDR   0193H   A   
+DISPLAY_SECONDS_CONTINUE .  C ADDR   01B5H   A   
+DISPLAY_SECONDS_CONTINUE_M  C ADDR   0121H   A   
+DISPLAY_TIMES. . . . . . .  C ADDR   010AH   A   
+DISPLAY_YEARS. . . . . . .  C ADDR   01D2H   A   
+DISPLAY_YEARS_CHECK. . . .  C ADDR   01D0H   A   
+DISPLAY_YEARS_CONTINUE . .  C ADDR   0212H   A   
+DPH. . . . . . . . . . . .  D ADDR   0083H   A   
+DPL. . . . . . . . . . . .  D ADDR   0082H   A   
+F0 . . . . . . . . . . . .  B ADDR   00D0H.5 A   
+HOURS. . . . . . . . . . .  D ADDR   0033H   A   
+HOURS_MAX. . . . . . . . .  N NUMB   0018H   A   
+IE . . . . . . . . . . . .  D ADDR   00A8H   A   
+INCREMENT_BUTTON . . . . .  B ADDR   00B0H.0 A   
+LEAP . . . . . . . . . . .  C ADDR   00ECH   A   
+MAIN . . . . . . . . . . .  C ADDR   0045H   A   
+MAIN_LOOP. . . . . . . . .  C ADDR   0066H   A   
+MINUTES. . . . . . . . . .  D ADDR   0032H   A   
+MINUTES_MAX. . . . . . . .  N NUMB   003CH   A   
+MODE_FLAG. . . . . . . . .  N NUMB   0030H   A   
+MONTH. . . . . . . . . . .  D ADDR   0037H   A   
+MONTH_MAX. . . . . . . . .  N NUMB   000CH   A   
+NOT_LEAP . . . . . . . . .  C ADDR   00F6H   A   
+P0 . . . . . . . . . . . .  D ADDR   0080H   A   
+P1 . . . . . . . . . . . .  D ADDR   0090H   A   
+P2 . . . . . . . . . . . .  D ADDR   00A0H   A   
+P3 . . . . . . . . . . . .  D ADDR   00B0H   A   
+PSW. . . . . . . . . . . .  D ADDR   00D0H   A   
+SECONDS. . . . . . . . . .  D ADDR   0031H   A   
+SECONDS_MAX. . . . . . . .  N NUMB   003CH   A   
+SETTING_MODE . . . . . . .  C ADDR   026DH   A   
+SETUP_BUTTON . . . . . . .  B ADDR   00B0H.1 A   
+SETUP_INCREMENT_DAY. . . .  C ADDR   02FBH   A   
+SETUP_INCREMENT_HOURS. . .  C ADDR   02A2H   A   
+SETUP_INCREMENT_MINUTES. .  C ADDR   02B3H   A   
+A51 MACRO ASSEMBLER  MAIN                                                                 05/29/2024 21:19:35 PAGE    10
+
+SETUP_INCREMENT_MONTH. . .  C ADDR   02ECH   A   
+SETUP_INCREMENT_SECONDS. .  C ADDR   02C2H   A   
+SETUP_INCREMENT_YEAR . . .  C ADDR   02D1H   A   
+SETUP_MODE_0 . . . . . . .  C ADDR   0282H   A   
+SETUP_MODE_1 . . . . . . .  C ADDR   0291H   A   
+SETUP_MODE_2 . . . . . . .  C ADDR   030AH   A   
+SETUP_RETURN . . . . . . .  C ADDR   0317H   A   
+SETUP_RETURN_1 . . . . . .  C ADDR   0290H   A   
+SP . . . . . . . . . . . .  D ADDR   0081H   A   
+SWITCH_BUTTON. . . . . . .  B ADDR   00B0H.3 A   
+SWITCH_FLAG. . . . . . . .  N NUMB   003AH   A   
+TH1. . . . . . . . . . . .  D ADDR   008DH   A   
+TIMER_INTERRUPT. . . . . .  C ADDR   0070H   A   
+TIMER_INTERRUPT_CONTINUE .  C ADDR   0105H   A   
+TIMER_INTERRUPT_CONTINUE_M  C ADDR   00F4H   A   
+TL1. . . . . . . . . . . .  D ADDR   008BH   A   
+TMOD . . . . . . . . . . .  D ADDR   0089H   A   
+TR1. . . . . . . . . . . .  B ADDR   0088H.6 A   
+YEAR . . . . . . . . . . .  D ADDR   0038H   A   
+YEARH. . . . . . . . . . .  D ADDR   0039H   A   
+YEAR_MAX . . . . . . . . .  N NUMB   0063H   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)
